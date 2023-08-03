@@ -162,7 +162,7 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      - parameter item: The AudioItem to load. The info given in this item is the one used for the InfoCenter.
      - parameter playWhenReady: Optional, whether to start playback when the item is ready.
      */
-    public func load(item: AudioItem, playWhenReady: Bool? = nil) {
+    public func load(item: AudioItem, playWhenReady: Bool? = nil, url: String? = nil) {
         currentItem = item
 
         if let playWhenReady = playWhenReady {
@@ -181,9 +181,8 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
         }
         
         enableRemoteCommands(forItem: item)
-        
         wrapper.load(
-            from: item.getSourceUrl(),
+            from: url ?? "",
             type: item.getSourceType(),
             playWhenReady: self.playWhenReady,
             initialTime: (item as? InitialTiming)?.getInitialTime(),

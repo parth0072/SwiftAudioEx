@@ -67,7 +67,8 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      - parameter item: The AudioItem to replace the current item.
      - parameter playWhenReady: Optional, whether to start playback when the item is ready.
      */
-    public override func load(item: AudioItem, playWhenReady: Bool? = nil) {
+
+    public override func load(item: AudioItem, playWhenReady: Bool? = nil, url: String? = nil) {
         if let playWhenReady = playWhenReady {
             self.playWhenReady = playWhenReady
         }
@@ -208,8 +209,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     func onCurrentItemChanged() {
         let lastPosition = currentTime;
-        if let currentItem = currentItem {
-            super.load(item: currentItem)
+        if let currentItem = currentItem as? AudioItem {
+            currentItem.getSourceUrl { url in
+                super.load(item: currentItem, url: url)
+            }
         } else {
             super.clear()
         }

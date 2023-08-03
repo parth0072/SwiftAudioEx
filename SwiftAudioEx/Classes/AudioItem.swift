@@ -16,7 +16,7 @@ public enum SourceType {
 
 public protocol AudioItem {
     
-    func getSourceUrl() -> String
+    func getSourceUrl(_ handler: @escaping (String) -> Void)
     func getArtist() -> String?
     func getTitle() -> String?
     func getAlbumTitle() -> String?
@@ -65,8 +65,8 @@ public class DefaultAudioItem: AudioItem {
         self.artwork = artwork
     }
     
-    public func getSourceUrl() -> String {
-        audioUrl
+    public func getSourceUrl(_ handler: @escaping (String) -> Void) {
+        handler(audioUrl)
     }
     
     public func getArtist() -> String? {
@@ -90,6 +90,8 @@ public class DefaultAudioItem: AudioItem {
     }
     
 }
+
+//extension AudioItem { }
 
 /// An AudioItem that also conforms to the `TimePitching`-protocol
 public class DefaultAudioItemTimePitching: DefaultAudioItem, TimePitching {
