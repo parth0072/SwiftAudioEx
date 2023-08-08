@@ -15,7 +15,8 @@ public enum SourceType {
 }
 
 public protocol AudioItem {
-    
+
+    var id: String? { get set }
     func getSourceUrl(_ handler: @escaping (String) -> Void)
     func getArtist() -> String?
     func getTitle() -> String?
@@ -43,7 +44,9 @@ public protocol AssetOptionsProviding {
 }
 
 public class DefaultAudioItem: AudioItem {
-    
+
+    public var id: String?
+
     public var audioUrl: String
     
     public var artist: String?
