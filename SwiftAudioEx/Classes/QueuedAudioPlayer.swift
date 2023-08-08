@@ -211,7 +211,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
             currentItem.getSourceUrl { url in
-                super.load(item: currentItem, url: url)
+                super.load(item: currentItem, playWhenReady: true, url: url)
             }
         } else {
             super.clear()
