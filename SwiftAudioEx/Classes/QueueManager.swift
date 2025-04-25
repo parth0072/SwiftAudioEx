@@ -11,6 +11,7 @@ protocol QueueManagerDelegate: AnyObject {
     func onReceivedFirstItem()
     func onCurrentItemChanged()
     func onSkippedToSameCurrentItem()
+    func onItemMoveEvent()
 }
 
 class QueueManager<T> {
@@ -258,6 +259,7 @@ class QueueManager<T> {
             if (fromIndex == currentIndex) {
                 currentIndex = toIndex;
             }
+            delegate?.onItemMoveEvent()
         }
     }
 

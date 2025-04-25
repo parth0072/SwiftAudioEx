@@ -207,6 +207,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     // MARK: - QueueManagerDelegate
 
+    func onItemMoveEvent() {
+        event.onItemMoveEvent.emit(data: ())
+    }
+
     func onCurrentItemChanged() {
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
