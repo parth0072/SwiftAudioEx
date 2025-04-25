@@ -46,11 +46,13 @@ protocol AVPlayerWrapperProtocol: AnyObject {
     func play()
     
     func pause()
-    
+
+    func recreatePlayer()
+
     func togglePlaying()
     
     func stop()
-    
+
     func seek(to seconds: TimeInterval)
 
     func seek(by offset: TimeInterval)

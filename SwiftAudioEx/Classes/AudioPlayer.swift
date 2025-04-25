@@ -197,6 +197,10 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
         wrapper.togglePlaying()
     }
 
+    public func recreatePlayer() {
+        wrapper.recreatePlayer()
+    }
+
     /**
      Start playback
      */

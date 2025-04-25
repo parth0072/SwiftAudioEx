@@ -20,7 +20,7 @@ public enum PlaybackEndedReason: String {
     case failed
 }
 
-class AVPlayerWrapper: AVPlayerWrapperProtocol {
+public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     // MARK: - Properties
     
     fileprivate var avPlayer = AVPlayer()
@@ -174,7 +174,11 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
     func pause() {
         playWhenReady = false
     }
-    
+
+    func recreatePlayer() {
+        recreateAVPlayer()
+    }
+
     func togglePlaying() {
         switch avPlayer.timeControlStatus {
         case .playing, .waitingToPlayAtSpecifiedRate:
@@ -377,7 +381,7 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
         playerItemNotificationObserver.stopObservingCurrentItem()
     }
     
-    private func recreateAVPlayer() {
+    func recreateAVPlayer() {
         playbackError = nil
         playerTimeObserver.unregisterForBoundaryTimeEvents()
         playerTimeObserver.unregisterForPeriodicEvents()
