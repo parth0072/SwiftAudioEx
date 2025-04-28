@@ -288,6 +288,7 @@ class QueueManager<T> {
         if (currentItemChanged) {
             delegate?.onCurrentItemChanged()
         }
+        delegate?.onItemMoveEvent()
         return result
     }
 
@@ -324,6 +325,7 @@ class QueueManager<T> {
             guard currentIndex > 0 else { return }
             items.removeSubrange(0..<currentIndex)
             currentIndex = 0
+            delegate?.onItemMoveEvent()
         }
     }
 
@@ -337,6 +339,7 @@ class QueueManager<T> {
             let nextIndex = currentIndex + 1
             guard nextIndex < items.count else { return }
             items.removeSubrange(nextIndex..<items.count)
+            delegate?.onItemMoveEvent()
         }
     }
 
@@ -354,6 +357,7 @@ class QueueManager<T> {
         if (currentItemChanged) {
             delegate?.onCurrentItemChanged()
         }
+        delegate?.onItemMoveEvent()
     }
 
 }
