@@ -357,7 +357,6 @@ class QueueManager<T> {
         if (currentItemChanged) {
             delegate?.onCurrentItemChanged()
         }
-        delegate?.onItemMoveEvent()
     }
 
 }
