@@ -56,20 +56,17 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     var _state: AVPlayerWrapperState = AVPlayerWrapperState.idle
     var state: AVPlayerWrapperState {
         get {
-            var state: AVPlayerWrapperState!
-            stateQueue.sync {
-                state = _state
-            }
-
-            return state
+            return stateQueue.sync { _state }
         }
         set {
             stateQueue.async(flags: .barrier) { [weak self] in
                 guard let self = self else { return }
                 let currentState = self._state
-                if (currentState != newValue) {
+                if currentState != newValue {
                     self._state = newValue
-                    self.delegate?.AVWrapper(didChangeState: newValue)
+                    DispatchQueue.main.async {
+                        self.delegate?.AVWrapper(didChangeState: newValue)
+                    }
                 }
             }
         }
