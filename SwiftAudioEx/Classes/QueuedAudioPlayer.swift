@@ -104,6 +104,14 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     public func add(items: [AudioItem], at index: Int) throws {
         try queue.add(items, at: index)
     }
+    
+    public func add(items: [AudioItem], playingIndex: Int, seekTo rate: Double) throws {
+        playWhenReady = false
+        queue.add(items)
+        try queue.jump(to: playingIndex)
+        wrapper.seek(to: rate)
+        wrapper.pause()
+    }
 
     /**
      Step to the next item in the queue.
@@ -215,7 +223,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
             currentItem.getSourceUrl { url in
-                super.load(item: currentItem, playWhenReady: true, url: url)
+                super.load(item: currentItem, playWhenReady: self.playWhenReady, url: url)
             }
         } else {
             super.clear()
