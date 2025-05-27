@@ -23,6 +23,8 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     /// The repeat mode for the queue player.
     public var repeatMode: RepeatMode = .off
+    
+    public var preloadingQueue = false
 
     public override var currentItem: AudioItem? {
         queue.current
@@ -223,7 +225,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
             currentItem.getSourceUrl { url in
-                super.load(item: currentItem, playWhenReady: true, url: url)
+                super.load(item: currentItem, playWhenReady: !self.preloadingQueue, url: url)
             }
         } else {
             super.clear()
