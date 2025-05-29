@@ -240,27 +240,27 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         let pendingAsset = AVURLAsset(url: url, options: urlOptions)
         asset = pendingAsset
         state = .loading
-
+        
         let keys: [String] = [
-            "playable"
+            "playable",
+            "availableChapterLocales",
+            "availableMetadataFormats",
+            "commonMetadata",
+            "duration"
         ]
         
         pendingAsset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
             guard let self = self else { return }
             DispatchQueue.main.async {
-                for key in keys {
-                    var error: NSError?
-                    let keyStatus = pendingAsset.statusOfValue(forKey: key, error: &error)
-                    switch keyStatus {
-                    case .failed:
-                        self.playbackFailed(error: AudioPlayerError.PlaybackError.failedToLoadKeyValue)
-                        return
-                    case .cancelled, .loading, .unknown:
-                        return
-                    case .loaded:
-                        break
-                    default: break
-                    }
+                var error: NSError?
+                let playableStatus = pendingAsset.statusOfValue(forKey: "playable", error: &error)
+                switch playableStatus {
+                case .cancelled, .loading, .unknown:
+                    return
+                case .failed:
+                    self.playbackFailed(error: AudioPlayerError.PlaybackError.failedToLoadKeyValue)
+                    return
+                default: break
                 }
                 self.handleLoadedAsset(pendingAsset)
             }
