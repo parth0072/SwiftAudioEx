@@ -242,11 +242,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         state = .loading
 
         let keys: [String] = [
-            "playable",
-            "availableChapterLocales",
-            "availableMetadataFormats",
-            "commonMetadata",
-            "duration"
+            "playable"
         ]
         
         pendingAsset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
