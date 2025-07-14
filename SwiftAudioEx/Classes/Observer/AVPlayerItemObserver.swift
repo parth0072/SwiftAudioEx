@@ -96,7 +96,7 @@ class AVPlayerItemObserver: NSObject {
                 delegate?.item(didUpdateDuration: duration.seconds)
             }
         
-        case AVPlayerItemKeyPath.loadedTimeRanges:
+        case AVPlayerItemKeyPath.loadedTimeRanges: break
 //            if let ranges = change?[.newKey] as? [NSValue], let duration = ranges.first?.timeRangeValue.duration {
 //                delegate?.item(didUpdateDuration: duration.seconds)
 //            }
