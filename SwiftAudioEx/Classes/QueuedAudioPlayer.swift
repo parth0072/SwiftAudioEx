@@ -25,7 +25,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     public var repeatMode: RepeatMode = .off
     
     public var preloadingQueue = false
-
+    
+    public var isOfflineMode = false
+    
     public override var currentItem: AudioItem? {
         queue.current
     }
@@ -121,7 +123,17 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     public func next() {
         let lastIndex = currentIndex
         let playbackWasActive = wrapper.playbackActive;
-        _ = queue.next(wrap: repeatMode == .queue)
+        if isOfflineMode, let nextOffline = queue.nextItems.first(
+            where: {
+                $0.getSourceType() == .offline
+            }), let index = queue.items.firstIndex(
+                where: {
+                    $0.id == nextOffline.id
+                }) {
+            _ = try? queue.jump(to: index)
+        } else {
+            _ = queue.next(wrap: repeatMode == .queue)
+        }
         if (playbackWasActive && lastIndex != currentIndex || repeatMode == .queue) {
             event.playbackEnd.emit(data: .skippedToNext)
         }
@@ -198,6 +210,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         seek(to: 0);
         play()
     }
+    
+    public func setOfflineMode(_ isOn: Bool) {
+        self.isOfflineMode = isOn
+    }
 
     // MARK: - AVPlayerWrapperDelegate
 
@@ -209,7 +225,17 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         } else if (repeatMode == .queue) {
             _ = queue.next(wrap: true)
         } else if (currentIndex != items.count - 1) {
-            _ = queue.next(wrap: false)
+            if isOfflineMode, let nextOffline = queue.nextItems.first(
+                where: {
+                    $0.getSourceType() == .offline
+                }), let index = queue.items.firstIndex(
+                    where: {
+                        $0.id == nextOffline.id
+                    }) {
+                _ = try? queue.jump(to: index)
+            } else {
+                _ = queue.next(wrap: false)
+            }
         } else {
             wrapper.state = .ended
         }

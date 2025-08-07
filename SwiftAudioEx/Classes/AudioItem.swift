@@ -12,6 +12,7 @@ import UIKit
 public enum SourceType {
     case stream
     case file
+    case offline
 }
 
 public protocol AudioItem {
