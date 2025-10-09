@@ -252,6 +252,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         if let currentItem = currentItem as? AudioItem {
             currentItem.getSourceUrl { url in
                 super.load(item: currentItem, playWhenReady: !self.preloadingQueue, url: url)
+                self.queue.nextItems.first?.getSourceUrl { url in
+                    guard let preloadUrl = URL(string: url) else { return }
+                    super.wrapper.preloadNextTracks(preloadUrl)
+                }
             }
         } else {
             super.clear()

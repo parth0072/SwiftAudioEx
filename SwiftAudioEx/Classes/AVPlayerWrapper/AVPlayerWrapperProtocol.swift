@@ -66,4 +66,7 @@ protocol AVPlayerWrapperProtocol: AnyObject {
     func unload()
     
     func reload(startFromCurrentTime: Bool)
+    
+    func preloadNextTracks(_ url: URL)
+
 }

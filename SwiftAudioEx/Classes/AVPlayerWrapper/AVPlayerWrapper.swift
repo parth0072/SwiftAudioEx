@@ -23,7 +23,7 @@ public enum PlaybackEndedReason: String {
 public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     // MARK: - Properties
     
-    fileprivate var avPlayer = AVPlayer()
+    fileprivate var avPlayer = AVQueuePlayer()
     private let playerObserver = AVPlayerObserver()
     internal let playerTimeObserver: AVPlayerTimeObserver
     private let playerItemNotificationObserver = AVPlayerItemNotificationObserver()
@@ -37,7 +37,9 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         label: "AVPlayerWrapper.stateQueue",
         attributes: .concurrent
     )
-
+    
+    private var nextAsset: AVAsset?
+    
     public init() {
         playerTimeObserver = AVPlayerTimeObserver(periodicObserverTimeInterval: timeEventFrequency.getTime())
 
@@ -231,16 +233,27 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     func load() {
         if state == .failed {
             recreateAVPlayer()
-        } else {
-            clearCurrentItem()
         }
-        
+        if let asset {
+            asset.cancelLoading()
+            self.asset = nil
+        }
+        self.stopObservingAVPlayerItem()
+        nextAsset?.cancelLoading()
         guard let url = url else { return }
-        
+        state = .loading
+        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url } {
+            self.item = item
+            self.avPlayer.advanceToNextItem()
+            self.applyAVPlayerRate()
+            self.asset = item.asset
+            self.startObservingAVPlayer(item: item)
+            self.applyAVPlayerRate()
+            return;
+        }
         let pendingAsset = AVURLAsset(url: url, options: urlOptions)
         asset = pendingAsset
-        state = .loading
-        
+        self.clearPreloadedTracks()
         let keys: [String] = [
             "playable",
             "availableChapterLocales",
@@ -286,7 +299,8 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         let item = AVPlayerItem(asset: pendingAsset, automaticallyLoadedAssetKeys: keysToLoad)
         self.item = item
         item.preferredForwardBufferDuration = self.bufferDuration
-        self.avPlayer.replaceCurrentItem(with: item)
+        self.avPlayer.removeAllItems()
+        self.avPlayer.insert(item, after: nil)
         self.startObservingAVPlayer(item: item)
         self.applyAVPlayerRate()
         
@@ -309,6 +323,38 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         }
     }
     
+    func preloadNextTracks(_ url: URL) {
+        guard !avPlayer.items().contains(where: { ($0.asset as? AVURLAsset)?.url == url} ) else { return }
+        nextAsset = AVURLAsset(url: url)
+        guard let asset = nextAsset else { return }
+        let keys = [
+            "playable",
+            "availableChapterLocales",
+            "availableMetadataFormats",
+            "commonMetadata",
+            "duration"
+        ]
+        asset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
+            guard let self = self else { return }
+            var error: NSError?
+            let status = asset.statusOfValue(forKey: "playable", error: &error)
+            guard status == .loaded else { return }
+            
+            let item = AVPlayerItem(asset: asset)
+            item.preferredForwardBufferDuration = 30
+            item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+            
+            DispatchQueue.main.async {
+                let lastItem = self.avPlayer.items().last
+                self.avPlayer.insert(item, after: lastItem)
+            }
+        }
+    }
+
+    func clearPreloadedTracks() {
+        avPlayer.removeAllItems()
+    }
+
     func load(from url: URL, playWhenReady: Bool, options: [String: Any]? = nil) {
         self.playWhenReady = playWhenReady
         self.url = url
@@ -399,7 +445,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         stopObservingAVPlayerItem()
         clearCurrentItem()
 
-        avPlayer = AVPlayer();
+        avPlayer = AVQueuePlayer();
         setupAVPlayer()
 
         delegate?.AVWrapperDidRecreateAVPlayer()
