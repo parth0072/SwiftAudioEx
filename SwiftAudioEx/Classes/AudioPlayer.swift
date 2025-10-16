@@ -318,6 +318,10 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
             event.playbackEnd.emit(data: .cleared)
         }
     }
+    
+    public func clearAvPlayerQueue() {
+        wrapper.clearAvPlayerQueue()
+    }
 
     // MARK: - Private
 

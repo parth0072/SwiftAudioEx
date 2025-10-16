@@ -48,6 +48,8 @@ protocol AVPlayerWrapperProtocol: AnyObject {
     func pause()
 
     func recreatePlayer()
+    
+    func clearAvPlayerQueue()
 
     func togglePlaying()
     

@@ -23,7 +23,7 @@ public enum PlaybackEndedReason: String {
 public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     // MARK: - Properties
     
-    fileprivate var avPlayer = AVQueuePlayer()
+    var avPlayer = AVQueuePlayer()
     private let playerObserver = AVPlayerObserver()
     internal let playerTimeObserver: AVPlayerTimeObserver
     private let playerItemNotificationObserver = AVPlayerItemNotificationObserver()
@@ -177,6 +177,10 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     func recreatePlayer() {
         recreateAVPlayer()
     }
+    
+    func clearAvPlayerQueue() {
+        avPlayer.removeAllItems()
+    }
 
     func togglePlaying() {
         switch avPlayer.timeControlStatus {
@@ -303,7 +307,6 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         self.avPlayer.insert(item, after: nil)
         self.startObservingAVPlayer(item: item)
         self.applyAVPlayerRate()
-        
         if !pendingAsset.availableChapterLocales.isEmpty {
             for locale in pendingAsset.availableChapterLocales {
                 let chapters = pendingAsset.chapterMetadataGroups(withTitleLocale: locale, containingItemsWithCommonKeys: nil)
