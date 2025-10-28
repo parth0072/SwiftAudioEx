@@ -39,6 +39,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     )
     
     private var nextAsset: AVAsset?
+    private var nextPreloadUrl: URL?
     
     public init() {
         playerTimeObserver = AVPlayerTimeObserver(periodicObserverTimeInterval: timeEventFrequency.getTime())
@@ -246,18 +247,21 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         nextAsset?.cancelLoading()
         guard let url = url else { return }
         state = .loading
-        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url } {
+        print("---- requesting new item \(url.absoluteString.suffix(10)) ")
+        print("---- \(avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) })")
+        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url }, avPlayer.items().count == 2 {
+            print("---- load existing item")
             self.item = item
             self.avPlayer.advanceToNextItem()
             self.applyAVPlayerRate()
             self.asset = item.asset
             self.startObservingAVPlayer(item: item)
             self.applyAVPlayerRate()
+            self.prefetchNextTracks()
             return;
         }
         let pendingAsset = AVURLAsset(url: url, options: urlOptions)
         asset = pendingAsset
-        self.clearPreloadedTracks()
         let keys: [String] = [
             "playable",
             "availableChapterLocales",
@@ -303,8 +307,10 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         let item = AVPlayerItem(asset: pendingAsset, automaticallyLoadedAssetKeys: keysToLoad)
         self.item = item
         item.preferredForwardBufferDuration = self.bufferDuration
+        print("---- avplayer removeallitems ----")
         self.avPlayer.removeAllItems()
         self.avPlayer.insert(item, after: nil)
+        self.prefetchNextTracks()
         self.startObservingAVPlayer(item: item)
         self.applyAVPlayerRate()
         if !pendingAsset.availableChapterLocales.isEmpty {
@@ -326,32 +332,44 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         }
     }
     
+    func prefetchNextTracks() {
+        QueuedAudioPlayer.nextAudioItem.first?.getSourceUrl({ [weak self] urlString in
+            guard let self = self else { return }
+            guard let url = URL(string: urlString) else { return }
+            nextAsset = AVURLAsset(url: url)
+            guard let asset = nextAsset else { return }
+            let keys = [
+                "playable",
+                "availableChapterLocales",
+                "availableMetadataFormats",
+                "commonMetadata",
+                "duration"
+            ]
+            asset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
+                guard let self = self else { return }
+                var error: NSError?
+                let status = asset.statusOfValue(forKey: "playable", error: &error)
+                guard status == .loaded else { return }
+                
+                let item = AVPlayerItem(asset: asset)
+                item.preferredForwardBufferDuration = 30
+                item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+                
+                DispatchQueue.main.async {
+                    if self.avPlayer.items().count > 1 {
+                        let nextItems = self.avPlayer.items().dropFirst()
+                        nextItems.forEach { self.avPlayer.remove($0) }
+                    }
+                    self.avPlayer.insert(item, after: nil)
+                    print("---- preload next item \((self.avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) }).joined(separator: "  ||  ") ) ")
+                }
+            }
+        })
+    }
+    
     func preloadNextTracks(_ url: URL) {
         guard !avPlayer.items().contains(where: { ($0.asset as? AVURLAsset)?.url == url} ) else { return }
-        nextAsset = AVURLAsset(url: url)
-        guard let asset = nextAsset else { return }
-        let keys = [
-            "playable",
-            "availableChapterLocales",
-            "availableMetadataFormats",
-            "commonMetadata",
-            "duration"
-        ]
-        asset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
-            guard let self = self else { return }
-            var error: NSError?
-            let status = asset.statusOfValue(forKey: "playable", error: &error)
-            guard status == .loaded else { return }
-            
-            let item = AVPlayerItem(asset: asset)
-            item.preferredForwardBufferDuration = 30
-            item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
-            
-            DispatchQueue.main.async {
-                let lastItem = self.avPlayer.items().last
-                self.avPlayer.insert(item, after: lastItem)
-            }
-        }
+        self.nextPreloadUrl = url
     }
 
     func clearPreloadedTracks() {

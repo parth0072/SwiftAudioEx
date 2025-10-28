@@ -28,6 +28,8 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     
     public var isOfflineMode = false
     
+    static var nextAudioItem = [AudioItem]()
+    
     public override var currentItem: AudioItem? {
         queue.current
     }
@@ -41,6 +43,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     override public func clear() {
         queue.clearQueue()
+        clearAvPlayetQueue()
         super.clear()
     }
 
@@ -216,6 +219,17 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     // MARK: - AVPlayerWrapperDelegate
+    
+    override func AVWrapper(didChangeState state: AVPlayerWrapperState) {
+        super.AVWrapper(didChangeState: state)
+        if state == .loading {
+            self.queue.nextItems.first?.getSourceUrl { url in
+                guard let preloadUrl = URL(string: url) else { return }
+                super.wrapper.preloadNextTracks(preloadUrl)
+            }
+        }
+        
+    }
 
     override func AVWrapperItemDidPlayToEndTime() {
         event.playbackEnd.emit(data: .playedUntilEnd)
@@ -242,20 +256,18 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     // MARK: - QueueManagerDelegate
+    
 
     func onItemMoveEvent() {
         event.onItemMoveEvent.emit(data: ())
     }
 
     func onCurrentItemChanged() {
+        Self.nextAudioItem = nextItems
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
             currentItem.getSourceUrl { url in
                 super.load(item: currentItem, playWhenReady: !self.preloadingQueue, url: url)
-                self.queue.nextItems.first?.getSourceUrl { url in
-                    guard let preloadUrl = URL(string: url) else { return }
-                    super.wrapper.preloadNextTracks(preloadUrl)
-                }
             }
         } else {
             super.clear()
