@@ -137,7 +137,9 @@ extension AudioPlayer {
         
         func emit(data: EventData) {
             queue.async {
-                self.invokers = self.invokers.filter { $0.invoke(data) }
+                DispatchQueue.main.async {
+                    self.invokers = self.invokers.filter { $0.invoke(data) }
+                }
             }
         }
     }
