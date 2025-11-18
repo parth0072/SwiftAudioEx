@@ -110,6 +110,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     public func add(items: [AudioItem], at index: Int) throws {
         try queue.add(items, at: index)
+        if index == currentIndex + 1 {
+            Self.nextAudioItem = nextItems
+            (wrapper as? AVPlayerWrapper)?.prefetchNextTracks()
+        }
     }
     
     public func add(items: [AudioItem], playingIndex: Int, seekTo rate: Double) throws {
