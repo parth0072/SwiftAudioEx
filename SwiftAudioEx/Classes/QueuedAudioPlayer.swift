@@ -110,6 +110,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     public func add(items: [AudioItem], at index: Int) throws {
         try queue.add(items, at: index)
+        if index == currentIndex + 1 {
+            updatePrefetchedSongs()
+        }
     }
     
     public func add(items: [AudioItem], playingIndex: Int, seekTo rate: Double) throws {
@@ -193,6 +196,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      */
     public func moveItem(fromIndex: Int, toIndex: Int) throws {
         try queue.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        if toIndex == currentIndex + 1 {
+            updatePrefetchedSongs()
+        }
     }
 
     /**
@@ -297,5 +303,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     
     func clearAvPlayetQueue() {
         wrapper.clearAvPlayerQueue()
+    }
+    
+    func updatePrefetchedSongs() {
+        Self.nextAudioItem = nextItems
+        (wrapper as? AVPlayerWrapper)?.prefetchNextTracks()
     }
 }
