@@ -1,3 +1,4 @@
+
 //
 //  QueuedAudioPlayer.swift
 //  SwiftAudio
@@ -197,6 +198,10 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      */
     public func moveItem(fromIndex: Int, toIndex: Int) throws {
         try queue.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        if toIndex == currentIndex + 1 {
+            Self.nextAudioItem = nextItems
+            (wrapper as? AVPlayerWrapper)?.prefetchNextTracks()
+        }
     }
 
     /**
