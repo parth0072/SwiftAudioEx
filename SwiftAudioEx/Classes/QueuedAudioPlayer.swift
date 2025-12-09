@@ -305,7 +305,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         wrapper.clearAvPlayerQueue()
     }
     
-    func updatePrefetchedSongs() {
+    public func updatePrefetchedSongs() {
         Self.nextAudioItem = nextItems
         (wrapper as? AVPlayerWrapper)?.prefetchNextTracks()
     }
