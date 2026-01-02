@@ -216,8 +216,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     func replay() {
-        seek(to: 0);
-        play()
+        guard let currentItem else { return }
+        clearAvPlayetQueue()
+        load(item: currentItem)
     }
     
     public func setOfflineMode(_ isOn: Bool) {
