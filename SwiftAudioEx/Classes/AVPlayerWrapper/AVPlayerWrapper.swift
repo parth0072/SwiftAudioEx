@@ -484,6 +484,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         playerTimeObserver.registerForPeriodicTimeEvents()
 
         applyAVPlayerRate()
+        avPlayer.actionAtItemEnd = .none
     }
     
     private func applyAVPlayerRate() {
