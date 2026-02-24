@@ -475,7 +475,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     private func setupAVPlayer() {
         // disabled since we're not making use of video playback
         avPlayer.allowsExternalPlayback = false;
-
+        AudioPlayer.avPlayerRef = avPlayer
         playerObserver.player = avPlayer
         playerObserver.startObserving()
 
