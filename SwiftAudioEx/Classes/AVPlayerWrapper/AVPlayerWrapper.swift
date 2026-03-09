@@ -62,14 +62,16 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return stateQueue.sync { _state }
         }
         set {
-            stateQueue.async(flags: .barrier) { [weak self] in
-                guard let self = self else { return }
-                let currentState = self._state
-                if currentState != newValue {
-                    self._state = newValue
-                    DispatchQueue.main.async {
-                        self.delegate?.AVWrapper(didChangeState: newValue)
-                    }
+            var didChangeState = false
+            stateQueue.sync(flags: .barrier) {
+                if (_state != newValue) {
+                    _state = newValue
+                    didChangeState = true
+                }
+            }
+            if didChangeState {
+                DispatchQueue.main.async {
+                    self.delegate?.AVWrapper(didChangeState: newValue)
                 }
             }
         }
@@ -526,7 +528,7 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
     
     func player(statusDidChange status: AVPlayer.Status) {
         if (status == .failed) {
-            let error = item!.error as NSError?
+            let error = (item?.error ?? avPlayer.error) as NSError?
             playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
                  ? AudioPlayerError.PlaybackError.notConnectedToInternet
                  : AudioPlayerError.PlaybackError.playbackFailed

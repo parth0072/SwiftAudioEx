@@ -18,6 +18,7 @@ device).
 
 ## Requirements
 iOS 11.0+
+Latest iOS SDKs (including iOS 26 simulator SDKs) are validated in CI builds.
 
 ## Installation
 

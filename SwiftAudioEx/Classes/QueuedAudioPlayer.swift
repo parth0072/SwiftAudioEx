@@ -299,7 +299,11 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     func onReceivedFirstItem() {
-        try! queue.jump(to: 0)
+        do {
+            try queue.jump(to: 0)
+        } catch {
+            assertionFailure("Unexpected failure when setting first queue item: \(error)")
+        }
     }
     
     func clearAvPlayetQueue() {

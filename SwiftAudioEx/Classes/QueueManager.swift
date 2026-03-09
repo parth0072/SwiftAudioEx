@@ -20,15 +20,15 @@ class QueueManager<T> {
 
     fileprivate func synchronizeThrows<T>(action: () throws -> T) throws -> T {
         recursiveLock.lock()
+        defer { recursiveLock.unlock() }
         let result = try action()
-        recursiveLock.unlock()
         return result
     }
 
     fileprivate func synchronize <T>(action: () -> T) -> T {
         recursiveLock.lock()
+        defer { recursiveLock.unlock() }
         let result = action()
-        recursiveLock.unlock()
         return result
     }
     

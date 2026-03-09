@@ -25,3 +25,10 @@ jobs:
           xcodebuild test -scheme SwiftAudio-Example -destination "${destination}" -enableCodeCoverage YES
         env:
           destination: ${{ matrix.destination }}
+  ios-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v2
+      - name: Build iOS (latest simulator SDK)
+        run: xcodebuild build -scheme SwiftAudio-Example -destination 'generic/platform=iOS Simulator'
