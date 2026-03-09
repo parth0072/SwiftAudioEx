@@ -62,14 +62,16 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return stateQueue.sync { _state }
         }
         set {
-            stateQueue.async(flags: .barrier) { [weak self] in
-                guard let self = self else { return }
-                let currentState = self._state
-                if currentState != newValue {
-                    self._state = newValue
-                    DispatchQueue.main.async {
-                        self.delegate?.AVWrapper(didChangeState: newValue)
-                    }
+            var didChangeState = false
+            stateQueue.sync(flags: .barrier) {
+                if (_state != newValue) {
+                    _state = newValue
+                    didChangeState = true
+                }
+            }
+            if didChangeState {
+                DispatchQueue.main.async {
+                    self.delegate?.AVWrapper(didChangeState: newValue)
                 }
             }
         }
@@ -205,7 +207,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         if (avPlayer.currentItem == nil) {
          timeToSeekToAfterLoading = seconds
        } else {
-           let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
+           let time = CMTime(seconds: seconds, preferredTimescale: 1000)
            avPlayer.seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { (finished) in
              self.delegate?.AVWrapper(seekTo: Double(seconds), didFinish: finished)
          }
@@ -216,7 +218,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         if let currentItem = avPlayer.currentItem {
             let time = currentItem.currentTime().seconds + seconds
             avPlayer.seek(
-                to: CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
+                to: CMTime(seconds: time, preferredTimescale: 1000)
             ) { (finished) in
                   self.delegate?.AVWrapper(seekTo: Double(time), didFinish: finished)
             }
@@ -249,7 +251,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         state = .loading
         print("---- requesting new item \(url.absoluteString.suffix(10)) ")
         print("---- \(avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) })")
-        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url }, avPlayer.items().count == 2 {
+        if let item = avPlayer.items().first(where: { ($0.asset as? AVURLAsset)?.url == url }), avPlayer.items().count == 2 {
             print("---- load existing item")
             self.item = item
             self.avPlayer.advanceToNextItem()
@@ -526,7 +528,7 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
     
     func player(statusDidChange status: AVPlayer.Status) {
         if (status == .failed) {
-            let error = item!.error as NSError?
+            let error = (item?.error ?? avPlayer.error) as NSError?
             playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
                  ? AudioPlayerError.PlaybackError.notConnectedToInternet
                  : AudioPlayerError.PlaybackError.playbackFailed

@@ -17,16 +17,19 @@ class AudioController {
     let audioSessionController = AudioSessionController.shared
     
     let sources: [AudioItem] = [
-        DefaultAudioItem(audioUrl: "https://p.scdn.co/mp3-preview/67b51d90ffddd6bb3f095059997021b589845f81?cid=d8a5ed958d274c2e8ee717e6a4b0971d", artist: "Bon Iver", title: "33 \"GOD\"", albumTitle: "22, A Million", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
-        DefaultAudioItem(audioUrl: "https://p.scdn.co/mp3-preview/081447adc23dad4f79ba4f1082615d1c56edf5e1?cid=d8a5ed958d274c2e8ee717e6a4b0971d", artist: "Bon Iver", title: "8 (circle)", albumTitle: "22, A Million", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
-        DefaultAudioItem(audioUrl: "https://ais-sa5.cdnstream1.com/b75154_128mp3", artist: "New York, NY", title: "Smooth Jazz 24/7", sourceType: .stream),
-        DefaultAudioItem(audioUrl: "https://p.scdn.co/mp3-preview/6f9999d909b017eabef97234dd7a206355720d9d?cid=d8a5ed958d274c2e8ee717e6a4b0971d", artist: "Bon Iver", title: "715 - CRΣΣKS", albumTitle: "22, A Million", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
-        DefaultAudioItem(audioUrl: "https://p.scdn.co/mp3-preview/bf9bdd403c67fdbe06a582e7b292487c8cfd1f7e?cid=d8a5ed958d274c2e8ee717e6a4b0971d", artist: "Bon Iver", title: "____45_____", albumTitle: "22, A Million", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI"))
+        DefaultAudioItem(audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", artist: "SoundHelix", title: "Song 1", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
+        DefaultAudioItem(audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", artist: "SoundHelix", title: "Song 2", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
+        DefaultAudioItem(audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3", artist: "SoundHelix", title: "Song 3", sourceType: .stream, artwork: #imageLiteral(resourceName: "cover")),
+        DefaultAudioItem(audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3", artist: "SoundHelix", title: "Song 4", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
+        DefaultAudioItem(audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3", artist: "SoundHelix", title: "Song 5", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
+        DefaultAudioItem(audioUrl: "https://ais-sa5.cdnstream1.com/b75154_128mp3", artist: "New York, NY", title: "Smooth Jazz 24/7", sourceType: .stream, artwork: #imageLiteral(resourceName: "cover")),
+        DefaultAudioItem(audioUrl: "https://traffic.libsyn.com/atpfm/atp545.mp3", title: "Chapters", sourceType: .stream, artwork: #imageLiteral(resourceName: "22AMI")),
     ]
     
     init() {
         let controller = RemoteCommandController()
         player = QueuedAudioPlayer(remoteCommandController: controller)
+        player.event.fail.addListener(self, handlePlayerFailure(error:))
         player.remoteCommands = [
             .stop,
             .play,
@@ -42,5 +45,10 @@ class AudioController {
             self.player.add(items: self.sources)
         }
     }
-    
+
+    private func handlePlayerFailure(error: Error?) {
+        print("Playback failed for current item. Error: \(String(describing: error))")
+        guard !player.nextItems.isEmpty else { return }
+        player.next()
+    }
 }
