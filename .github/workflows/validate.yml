@@ -27,3 +27,10 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+  ios-build:
+    runs-on: blaze/macos-14
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Build iOS (latest simulator SDK)
+        run: xcodebuild build -scheme SwiftAudioEx -destination 'generic/platform=iOS Simulator'

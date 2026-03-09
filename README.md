@@ -33,6 +33,7 @@ device).
 ## Requirements
 
 iOS 11.0+
+Latest iOS SDKs (including iOS 26 simulator SDKs) are validated in CI builds.
 
 ## Installation
 
@@ -40,7 +41,7 @@ iOS 11.0+
 
 [Swift Package Manager](https://swift.org/package-manager/) (SwiftPM) is a tool for managing the distribution of Swift code as well as C-family dependency. From Xcode 11, SwiftPM got natively integrated with Xcode.
 
-SwiftAudioEx supports SwiftPM from version 0.12.0. To use SwiftPM, you should use Xcode 11 to open your project. Click `File` -> `Swift Packages` -> `Add Package Dependency`, enter [SwiftAudioEx repo's URL](https://github.com/doublesymmetry/SwiftAudio.git). Or you can login Xcode with your GitHub account and just type `SwiftAudioEx` to search.
+SwiftAudioEx supports SwiftPM from version 0.12.0. To use SwiftPM, you should use Xcode 11 to open your project. Click `File` -> `Swift Packages` -> `Add Package Dependency`, enter [SwiftAudioEx repo's URL](https://github.com/doublesymmetry/SwiftAudioEx.git). Or you can login Xcode with your GitHub account and just type `SwiftAudioEx` to search.
 
 After select the package, you can choose the dependency type (tagged version, branch or commit). Then Xcode will setup all the stuff for you.
 
@@ -50,7 +51,7 @@ If you're a framework author and use SwiftAudioEx as a dependency, update your `
 let package = Package(
     // 0.12.0 ..< 1.0.0
     dependencies: [
-        .package(url: "https://github.com/doublesymmetry/SwiftAudio.git", from: "1.0.0")
+        .package(url: "https://github.com/doublesymmetry/SwiftAudioEx.git", from: "1.0.0")
     ],
     // ...
 )
