@@ -18,14 +18,14 @@ class QueueManager<T> {
 
     fileprivate let recursiveLock = NSRecursiveLock()
 
-    fileprivate func synchronizeThrows<T>(action: () throws -> T) throws -> T {
+    fileprivate func synchronizeThrows<R>(action: () throws -> R) throws -> R {
         recursiveLock.lock()
         defer { recursiveLock.unlock() }
         let result = try action()
         return result
     }
 
-    fileprivate func synchronize <T>(action: () -> T) -> T {
+    fileprivate func synchronize<R>(action: () -> R) -> R {
         recursiveLock.lock()
         defer { recursiveLock.unlock() }
         let result = action()
@@ -175,9 +175,7 @@ class QueueManager<T> {
             let oldIndex = currentIndex
             currentIndex = max(0, min(items.count - 1, index))
             if (oldIndex != currentIndex) {
-                defer {
-                    delegate?.onCurrentItemChanged()
-                }
+                delegate?.onCurrentItemChanged()
             }
         }
         return current

@@ -17,7 +17,7 @@ XCode project navigator and Build/Run it in a simulator (or on an actual
 device).
 
 ## Requirements
-iOS 11.0+
+iOS 15.6+
 Latest iOS SDKs (including iOS 26 simulator SDKs) are validated in CI builds.
 
 ## Installation

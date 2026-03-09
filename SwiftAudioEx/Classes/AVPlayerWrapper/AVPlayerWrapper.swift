@@ -207,7 +207,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         if (avPlayer.currentItem == nil) {
          timeToSeekToAfterLoading = seconds
        } else {
-           let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
+           let time = CMTime(seconds: seconds, preferredTimescale: 1000)
            avPlayer.seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { (finished) in
              self.delegate?.AVWrapper(seekTo: Double(seconds), didFinish: finished)
          }
@@ -218,7 +218,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         if let currentItem = avPlayer.currentItem {
             let time = currentItem.currentTime().seconds + seconds
             avPlayer.seek(
-                to: CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
+                to: CMTime(seconds: time, preferredTimescale: 1000)
             ) { (finished) in
                   self.delegate?.AVWrapper(seekTo: Double(time), didFinish: finished)
             }
@@ -251,7 +251,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         state = .loading
         print("---- requesting new item \(url.absoluteString.suffix(10)) ")
         print("---- \(avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) })")
-        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url }, avPlayer.items().count == 2 {
+        if let item = avPlayer.items().first(where: { ($0.asset as? AVURLAsset)?.url == url }), avPlayer.items().count == 2 {
             print("---- load existing item")
             self.item = item
             self.avPlayer.advanceToNextItem()

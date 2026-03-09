@@ -164,7 +164,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      - throws: `AudioPlayerError.QueueError`
      */
     public func removeItem(at index: Int) throws {
-        try queue.removeItem(at: index)
+        _ = try queue.removeItem(at: index)
     }
 
 
@@ -272,7 +272,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     func onCurrentItemChanged() {
         Self.nextAudioItem = nextItems
         let lastPosition = currentTime;
-        if let currentItem = currentItem as? AudioItem {
+        if let currentItem = currentItem {
             currentItem.getSourceUrl { url in
                 super.load(item: currentItem, playWhenReady: !self.preloadingQueue, url: url)
             }

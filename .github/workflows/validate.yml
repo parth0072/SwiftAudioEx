@@ -22,7 +22,7 @@ jobs:
       - name: Run Tests
         run: |-
           cd Example
-          xcodebuild test -scheme SwiftAudio-Example -destination "${destination}" -enableCodeCoverage YES
+          xcodebuild test -project SwiftAudio.xcodeproj -scheme SwiftAudio-Example -destination "${destination}" -enableCodeCoverage YES
         env:
           destination: ${{ matrix.destination }}
   ios-build:
@@ -31,4 +31,4 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v2
       - name: Build iOS (latest simulator SDK)
-        run: xcodebuild build -scheme SwiftAudio-Example -destination 'generic/platform=iOS Simulator'
+        run: xcodebuild build -project Example/SwiftAudio.xcodeproj -scheme SwiftAudio-Example -destination 'generic/platform=iOS Simulator'
