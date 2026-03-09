@@ -43,7 +43,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     override public func clear() {
         queue.clearQueue()
-        clearAvPlayetQueue()
+        clearUnderlyingPlayerQueue()
         super.clear()
     }
 
@@ -76,9 +76,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      */
 
     public override func load(item: AudioItem, playWhenReady: Bool? = nil, url: String? = nil) {
-        if let playWhenReady = playWhenReady {
-            self.playWhenReady = playWhenReady
-        }
+        applyPlayWhenReady(playWhenReady)
         queue.replaceCurrentItem(with: item)
     }
 
@@ -89,9 +87,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      - parameter playWhenReady: Optional, whether to start playback when the item is ready.
      */
     public func add(item: AudioItem, playWhenReady: Bool? = nil) {
-        if let playWhenReady = playWhenReady {
-            self.playWhenReady = playWhenReady
-        }
+        applyPlayWhenReady(playWhenReady)
         queue.add(item)
     }
 
@@ -102,9 +98,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      - parameter playWhenReady: Optional, whether to start playback when the item is ready.
      */
     public func add(items: [AudioItem], playWhenReady: Bool? = nil) {
-        if let playWhenReady = playWhenReady {
-            self.playWhenReady = playWhenReady
-        }
+        applyPlayWhenReady(playWhenReady)
         queue.add(items)
     }
 
@@ -128,21 +122,32 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      */
     public func next() {
         let lastIndex = currentIndex
-        let playbackWasActive = wrapper.playbackActive;
-        if isOfflineMode, let nextOffline = queue.nextItems.first(
-            where: {
-                $0.getSourceType() == .offline
-            }), let index = queue.items.firstIndex(
-                where: {
-                    $0.id == nextOffline.id
-                }) {
-            _ = try? queue.jump(to: index)
+        let playbackWasActive = wrapper.playbackActive
+        if let offlineIndex = nextOfflineIndex() {
+            _ = try? queue.jump(to: offlineIndex)
         } else {
             _ = queue.next(wrap: repeatMode == .queue)
         }
-        if (playbackWasActive && lastIndex != currentIndex || repeatMode == .queue) {
+        if shouldEmitSkipEvent(playbackWasActive: playbackWasActive, previousIndex: lastIndex) {
             event.playbackEnd.emit(data: .skippedToNext)
         }
+    }
+
+    private func nextOfflineIndex() -> Int? {
+        guard isOfflineMode,
+              let nextOffline = queue.nextItems.first(where: { $0.getSourceType() == .offline }) else {
+            return nil
+        }
+        return queue.items.firstIndex(where: { $0.id == nextOffline.id })
+    }
+
+    private func shouldEmitSkipEvent(playbackWasActive: Bool, previousIndex: Int) -> Bool {
+        (playbackWasActive && previousIndex != currentIndex) || repeatMode == .queue
+    }
+
+    private func applyPlayWhenReady(_ value: Bool?) {
+        guard let value else { return }
+        playWhenReady = value
     }
 
     /**
@@ -150,9 +155,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      */
     public func previous() {
         let lastIndex = currentIndex
-        let playbackWasActive = wrapper.playbackActive;
+        let playbackWasActive = wrapper.playbackActive
         _ = queue.previous(wrap: repeatMode == .queue)
-        if (playbackWasActive && lastIndex != currentIndex || repeatMode == .queue) {
+        if shouldEmitSkipEvent(playbackWasActive: playbackWasActive, previousIndex: lastIndex) {
             event.playbackEnd.emit(data: .skippedToPrevious)
         }
     }
@@ -176,9 +181,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
      - throws: `AudioPlayerError`
      */
     public func jumpToItem(atIndex index: Int, playWhenReady: Bool? = nil) throws {
-        if let playWhenReady = playWhenReady {
-            self.playWhenReady = playWhenReady
-        }
+        applyPlayWhenReady(playWhenReady)
         if (index == currentIndex) {
             seek(to: 0)
         } else {
@@ -217,7 +220,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     func replay() {
         guard let currentItem else { return }
-        clearAvPlayetQueue()
+        clearUnderlyingPlayerQueue()
         load(item: currentItem)
     }
     
@@ -246,14 +249,8 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         } else if (repeatMode == .queue) {
             _ = queue.next(wrap: true)
         } else if (currentIndex != items.count - 1) {
-            if isOfflineMode, let nextOffline = queue.nextItems.first(
-                where: {
-                    $0.getSourceType() == .offline
-                }), let index = queue.items.firstIndex(
-                    where: {
-                        $0.id == nextOffline.id
-                    }) {
-                _ = try? queue.jump(to: index)
+            if let offlineIndex = nextOfflineIndex() {
+                _ = try? queue.jump(to: offlineIndex)
             } else {
                 _ = queue.next(wrap: false)
             }
@@ -306,7 +303,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         }
     }
     
-    func clearAvPlayetQueue() {
+    private func clearUnderlyingPlayerQueue() {
         wrapper.clearAvPlayerQueue()
     }
     
