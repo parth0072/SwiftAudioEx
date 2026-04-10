@@ -15,6 +15,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     let queue: QueueManager = QueueManager<AudioItem>()
     fileprivate var lastIndex: Int = -1
     fileprivate var lastItem: AudioItem? = nil
+    private var spuriousEndRetryCount = 0
 
     public override init(nowPlayingInfoController: NowPlayingInfoControllerProtocol = NowPlayingInfoController(), remoteCommandController: RemoteCommandController = RemoteCommandController()) {
         super.init(nowPlayingInfoController: nowPlayingInfoController, remoteCommandController: remoteCommandController)
@@ -229,6 +230,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     
     override func AVWrapper(didChangeState state: AVPlayerWrapperState) {
         super.AVWrapper(didChangeState: state)
+        if state == .playing {
+            spuriousEndRetryCount = 0
+        }
         if state == .loading {
             self.queue.nextItems.first?.getSourceUrl { url in
                 guard let preloadUrl = URL(string: url) else { return }
@@ -239,20 +243,32 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     override func AVWrapperItemDidPlayToEndTime() {
+        let duration = wrapper.duration
+        let currentTime = wrapper.currentTime
+        
+        if duration > 0, currentTime < duration - 2.0 {
+            if spuriousEndRetryCount < 2 {
+                spuriousEndRetryCount += 1
+                wrapper.reload(startFromCurrentTime: true)
+            } else {
+                // Reloading didn't recover — treat as failure and skip
+                spuriousEndRetryCount = 0
+                event.playbackEnd.emit(data: .failed)
+                _ = queue.next(wrap: false)
+            }
+            return
+        }
+        
+        spuriousEndRetryCount = 0
         event.playbackEnd.emit(data: .playedUntilEnd)
         if (repeatMode == .track) {
-            // quick workaround for race condition - place call bottom of call stack
             DispatchQueue.main.async { [weak self] in self?.replay() }
         } else if (repeatMode == .queue) {
             _ = queue.next(wrap: true)
         } else if (currentIndex != items.count - 1) {
             if isOfflineMode, let nextOffline = queue.nextItems.first(
-                where: {
-                    $0.getSourceType() == .offline
-                }), let index = queue.items.firstIndex(
-                    where: {
-                        $0.id == nextOffline.id
-                    }) {
+                where: { $0.getSourceType() == .offline }),
+               let index = queue.items.firstIndex(where: { $0.id == nextOffline.id }) {
                 _ = try? queue.jump(to: index)
             } else {
                 _ = queue.next(wrap: false)
