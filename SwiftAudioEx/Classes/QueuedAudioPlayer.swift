@@ -234,9 +234,16 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
             spuriousEndRetryCount = 0
         }
         if state == .loading {
-            self.queue.nextItems.first?.getSourceUrl { url in
-                guard let preloadUrl = URL(string: url) else { return }
-                super.wrapper.preloadNextTracks(preloadUrl)
+            if repeatMode == .queue && queue.nextItems.isEmpty {
+                self.queue.items.first?.getSourceUrl { url in
+                    guard let preloadUrl = URL(string: url) else { return }
+                    super.wrapper.preloadNextTracks(preloadUrl)
+                }
+            } else {
+                self.queue.nextItems.first?.getSourceUrl { url in
+                    guard let preloadUrl = URL(string: url) else { return }
+                    super.wrapper.preloadNextTracks(preloadUrl)
+                }
             }
         }
         
