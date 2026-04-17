@@ -40,6 +40,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     
     private var nextAsset: AVAsset?
     private var nextPreloadUrl: URL?
+    private var wasPlayingBeforeStall = false
     
     public init() {
         playerTimeObserver = AVPlayerTimeObserver(periodicObserverTimeInterval: timeEventFrequency.getTime())
@@ -503,11 +504,13 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
             if self.asset == nil && state != .stopped {
                 self.state = .idle
             } else if (state != .failed && state != .stopped) {
-                // Playback may have become paused externally for example due to a bluetooth device disconnecting:
+                // Playback may have become paused externally for example due to a bluetooth device disconnecting,
+                // or a buffer stall when automaticallyWaitsToMinimizeStalling = false:
                 if (self.playWhenReady) {
                     // Only if we are not on the boundaries of the track, otherwise itemDidPlayToEndTime will handle it instead.
                     if (self.currentTime > 0 && self.currentTime < self.duration) {
-                        self.playWhenReady = false;
+                        wasPlayingBeforeStall = true
+                        self.playWhenReady = false
                     }
                 } else {
                     self.state = .paused
@@ -518,6 +521,7 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
                 self.state = .buffering
             }
         case .playing:
+            wasPlayingBeforeStall = false
             self.state = .playing
         @unknown default:
             break
@@ -571,8 +575,12 @@ extension AVPlayerWrapper: AVPlayerItemObserverDelegate {
     // MARK: - AVPlayerItemObserverDelegate
 
     func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool) {
-        if (playbackLikelyToKeepUp && state != .playing) {
+        if playbackLikelyToKeepUp && state != .playing {
             state = .ready
+            if wasPlayingBeforeStall {
+                wasPlayingBeforeStall = false
+                playWhenReady = true
+            }
         }
     }
         
