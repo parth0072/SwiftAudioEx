@@ -237,11 +237,13 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
             if repeatMode == .queue && queue.nextItems.isEmpty {
                 self.queue.items.first?.getSourceUrl { url in
                     guard let preloadUrl = URL(string: url) else { return }
+                    PlayTrace.log("unused preload URL resolved \(PlayTrace.id(preloadUrl))")
                     super.wrapper.preloadNextTracks(preloadUrl)
                 }
             } else {
                 self.queue.nextItems.first?.getSourceUrl { url in
                     guard let preloadUrl = URL(string: url) else { return }
+                    PlayTrace.log("unused preload URL resolved \(PlayTrace.id(preloadUrl))")
                     super.wrapper.preloadNextTracks(preloadUrl)
                 }
             }
@@ -293,6 +295,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     func onCurrentItemChanged() {
+        PlayTrace.log("current item \(currentItem?.getTitle() ?? "none") (#\(currentIndex))")
         Self.nextAudioItem = nextItems
         let lastPosition = currentTime;
         if let currentItem = currentItem as? AudioItem {
