@@ -181,7 +181,6 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     }
     
     func clearAvPlayerQueue() {
-        PlayTrace.log("clear player queue \(PlayTrace.ids(avPlayer.items())), pending preload: \(nextAsset != nil)")
         avPlayer.removeAllItems()
     }
 
@@ -251,13 +250,10 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return
         }
         state = .loading
-        let traceId = PlayTrace.id(url)
-        PlayTrace.log("load \(traceId), player has \(PlayTrace.ids(avPlayer.items()))")
         print("---- requesting new item \(url.absoluteString.suffix(10)) ")
         print("---- \(avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) })")
         if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url }, avPlayer.items().count == 2 {
             print("---- load existing item")
-            PlayTrace.log("fast path: reusing preloaded \(traceId)")
             nextAsset = nil
             self.item = item
             self.avPlayer.advanceToNextItem()
@@ -268,29 +264,20 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             self.prefetchNextTracks()
             return;
         }
-        // SLOW-START FIX: if the preloader is already fetching this exact URL, adopt that
-        // in-flight asset instead of cancelling it and re-requesting the same URL. Field
-        // traces showed cancel-then-reload of the same URL stalling inside AVFoundation for
-        // 1.5-15 s (every slow song start in three user logs followed a
-        // "preload keys done ... playable=cancelled" for the URL being loaded).
+        // Join the preloader's in-flight load of this URL; cancelling and re-requesting it stalls the start
         if let inFlight = nextAsset as? AVURLAsset,
            inFlight.url == url,
            inFlight.statusOfValue(forKey: "playable", error: nil) == .loading {
-            PlayTrace.log("adopting in-flight preload for \(traceId)")
             nextAsset = nil
             asset = inFlight
-            awaitAssetKeys(inFlight, traceId: traceId, origin: "adopted preload")
+            awaitAssetKeys(inFlight)
             return
         }
         nextAsset?.cancelLoading()
         nextAsset = nil
         let pendingAsset = AVURLAsset(url: url, options: urlOptions)
         asset = pendingAsset
-        PlayTrace.log("slow path: loading 5 keys for \(traceId)")
-        pendingAsset.loadValuesAsynchronously(forKeys: ["playable"]) {
-            PlayTrace.log("probe: playable \(PlayTrace.describe(pendingAsset.statusOfValue(forKey: "playable", error: nil))) for \(traceId)")
-        }
-        awaitAssetKeys(pendingAsset, traceId: traceId, origin: "slow path")
+        awaitAssetKeys(pendingAsset)
     }
 
     private static let assetKeys: [String] = [
@@ -301,15 +288,11 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         "duration"
     ]
 
-    /// Waits for the asset's keys (a no-op join if they are already loading) and hands the
-    /// asset to handleLoadedAsset. Shared by the slow path and the adopted-preload path.
-    private func awaitAssetKeys(_ pendingAsset: AVURLAsset, traceId: String, origin: String) {
+    private func awaitAssetKeys(_ pendingAsset: AVURLAsset) {
         let keys = Self.assetKeys
         pendingAsset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
             guard let self = self else { return }
             DispatchQueue.main.async {
-                let keyStatuses = keys.map { "\($0)=\(PlayTrace.describe(pendingAsset.statusOfValue(forKey: $0, error: nil)))" }
-                PlayTrace.log("5 keys done (\(origin)) for \(traceId): \(keyStatuses.joined(separator: " "))")
                 var error: NSError?
                 let playableStatus = pendingAsset.statusOfValue(forKey: "playable", error: &error)
                 switch playableStatus {
@@ -326,10 +309,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     }
     
     private func handleLoadedAsset(_ pendingAsset: AVURLAsset) {
-        guard pendingAsset == asset else {
-            PlayTrace.log("ignored stale asset \(PlayTrace.id(pendingAsset.url))")
-            return
-        }
+        guard pendingAsset == asset else { return }
         
         if !pendingAsset.isPlayable {
             playbackFailed(error: AudioPlayerError.PlaybackError.itemWasUnplayable)
@@ -350,7 +330,6 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         print("---- avplayer removeallitems ----")
         self.avPlayer.removeAllItems()
         self.avPlayer.insert(item, after: nil)
-        PlayTrace.log("item inserted \(PlayTrace.id(pendingAsset.url)), player has \(PlayTrace.ids(avPlayer.items()))")
         self.prefetchNextTracks()
         self.startObservingAVPlayer(item: item)
         self.applyAVPlayerRate()
@@ -374,12 +353,10 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     }
     
     func prefetchNextTracks() {
-        PlayTrace.log("preload requested for next: \(QueuedAudioPlayer.nextAudioItem.first?.getTitle() ?? "none")")
         QueuedAudioPlayer.nextAudioItem.first?.getSourceUrl({ [weak self] urlString in
             guard let self = self else { return }
             guard let url = URL(string: urlString) else { return }
             nextAsset = AVURLAsset(url: url)
-            PlayTrace.log("preload loading keys for \(PlayTrace.id(url))")
             guard let asset = nextAsset else { return }
             let keys = [
                 "playable",
@@ -392,7 +369,6 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
                 guard let self = self else { return }
                 var error: NSError?
                 let status = asset.statusOfValue(forKey: "playable", error: &error)
-                PlayTrace.log("preload keys done for \(PlayTrace.id(url)): playable=\(PlayTrace.describe(status))")
                 guard status == .loaded else { return }
                 
                 let item = AVPlayerItem(asset: asset)
@@ -400,22 +376,12 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
                 item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
                 
                 DispatchQueue.main.async {
-                    let isLatestPreload = asset === self.nextAsset
-                    let playerWasEmpty = self.avPlayer.items().isEmpty
-                    let loadInProgress = self.state == .loading
-                    // SLOW-START FIX: only the current preload may insert itself as the next
-                    // item. A preload that load() adopted as the current asset, or that a newer
-                    // preload replaced, must not be inserted a second time.
-                    guard isLatestPreload else {
-                        PlayTrace.log("preload superseded, not inserting \(PlayTrace.id(url))")
-                        return
-                    }
+                    guard asset === self.nextAsset else { return }
                     if self.avPlayer.items().count > 1 {
                         let nextItems = self.avPlayer.items().dropFirst()
                         nextItems.forEach { self.avPlayer.remove($0) }
                     }
                     self.avPlayer.insert(item, after: nil)
-                    PlayTrace.log("preload inserted \(PlayTrace.id(url)) latest=\(isLatestPreload) playerWasEmpty=\(playerWasEmpty) loadInProgress=\(loadInProgress), player has \(PlayTrace.ids(self.avPlayer.items()))")
                     print("---- preload next item \((self.avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) }).joined(separator: "  ||  ") ) ")
                 }
             }
@@ -495,7 +461,6 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
 
     private func clearCurrentItem() {
         guard let asset = asset else { return }
-        PlayTrace.log("clear current item \(PlayTrace.id((asset as? AVURLAsset)?.url)), pending preload: \(nextAsset != nil)")
         stopObservingAVPlayerItem()
         
         asset.cancelLoading()
@@ -553,8 +518,6 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
     // MARK: - AVPlayerObserverDelegate
     
     func player(didChangeTimeControlStatus status: AVPlayer.TimeControlStatus) {
-        let waitingReason = status == .waitingToPlayAtSpecifiedRate ? " (\(avPlayer.reasonForWaitingToPlay?.rawValue ?? "no reason"))" : ""
-        PlayTrace.log("timeControlStatus \(PlayTrace.describe(status))\(waitingReason) for \(PlayTrace.id((avPlayer.currentItem?.asset as? AVURLAsset)?.url))")
         switch status {
         case .paused:
             let state = self.state
@@ -580,11 +543,6 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
         case .playing:
             wasPlayingBeforeStall = false
             self.state = .playing
-            if let event = avPlayer.currentItem?.accessLog()?.events.last {
-                let startup = String(format: "%.2f", event.startupTime)
-                let transfer = String(format: "%.2f", event.transferDuration)
-                PlayTrace.log("access log: startup \(startup)s, \(event.numberOfMediaRequests) requests, \(event.numberOfBytesTransferred / 1024) KB in \(transfer)s, server changes \(event.numberOfServerAddressChanges)")
-            }
         @unknown default:
             break
         }
@@ -606,7 +564,6 @@ extension AVPlayerWrapper: AVPlayerTimeObserverDelegate {
     // MARK: - AVPlayerTimeObserverDelegate
     
     func audioDidStart() {
-        PlayTrace.log("audio started")
         state = .playing
     }
     
@@ -638,7 +595,6 @@ extension AVPlayerWrapper: AVPlayerItemObserverDelegate {
     // MARK: - AVPlayerItemObserverDelegate
 
     func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool) {
-        PlayTrace.log("likelyToKeepUp \(playbackLikelyToKeepUp)")
         if playbackLikelyToKeepUp && state != .playing {
             state = .ready
             if wasPlayingBeforeStall {
@@ -654,73 +610,5 @@ extension AVPlayerWrapper: AVPlayerItemObserverDelegate {
     
     func item(didReceiveMetadata metadata: [AVTimedMetadataGroup]) {
         delegate?.AVWrapper(didReceiveMetadata: metadata)
-    }
-}
-
-public enum PlayTrace {
-    public static var output: ((String) -> Void)?
-    private static let lock = NSLock()
-    private static var start = ProcessInfo.processInfo.systemUptime
-    private static var last = ProcessInfo.processInfo.systemUptime
-
-    public static func begin(_ message: String) {
-        lock.lock()
-        start = ProcessInfo.processInfo.systemUptime
-        last = start
-        lock.unlock()
-        write("[PlayTrace] ==== " + message)
-    }
-
-    public static func log(_ message: String) {
-        lock.lock()
-        let now = ProcessInfo.processInfo.systemUptime
-        let line = String(format: "[PlayTrace] +%.0fms (+%.0fms) ", (now - start) * 1000, (now - last) * 1000) + message
-        last = now
-        lock.unlock()
-        write(line)
-    }
-
-    private static func write(_ line: String) {
-        if let output = output {
-            output(line)
-        } else {
-            NSLog("%@", line)
-        }
-    }
-
-    public static func id(_ url: URL?) -> String {
-        guard let url = url else { return "none" }
-        if url.isFileURL {
-            return "file " + url.lastPathComponent
-        }
-        let trackId = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-            .queryItems?
-            .first(where: { $0.name == "trackId" })?
-            .value
-        return trackId ?? String(url.absoluteString.suffix(10))
-    }
-
-    public static func ids(_ items: [AVPlayerItem]) -> String {
-        "[" + items.map { id(($0.asset as? AVURLAsset)?.url) }.joined(separator: ", ") + "]"
-    }
-
-    public static func describe(_ status: AVKeyValueStatus) -> String {
-        switch status {
-        case .unknown: return "unknown"
-        case .loading: return "loading"
-        case .loaded: return "loaded"
-        case .failed: return "failed"
-        case .cancelled: return "cancelled"
-        @unknown default: return "other"
-        }
-    }
-
-    public static func describe(_ status: AVPlayer.TimeControlStatus) -> String {
-        switch status {
-        case .paused: return "paused"
-        case .waitingToPlayAtSpecifiedRate: return "waiting"
-        case .playing: return "playing"
-        @unknown default: return "other"
-        }
     }
 }
