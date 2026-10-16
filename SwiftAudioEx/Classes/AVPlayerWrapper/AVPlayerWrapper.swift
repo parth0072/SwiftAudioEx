@@ -243,6 +243,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         if let asset {
             asset.cancelLoading()
             self.asset = nil
+            releaseLoaderIfUnused(asset)
         }
         self.stopObservingAVPlayerItem()
         guard let url = url else {
@@ -250,15 +251,18 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return
         }
         state = .loading
+        let assetURL = StreamResourceLoader.assetURL(for: url)
         print("---- requesting new item \(url.absoluteString.suffix(10)) ")
         print("---- \(avPlayer.items().compactMap { ($0.asset as? AVURLAsset)?.url.absoluteString.suffix(10) })")
-        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == url }, avPlayer.items().count == 2 {
+        if let item = avPlayer.items().first { ($0.asset as? AVURLAsset)?.url == assetURL }, avPlayer.items().count == 2 {
             print("---- load existing item")
             nextAsset = nil
             self.item = item
+            let previousAsset = self.avPlayer.currentItem?.asset
             self.avPlayer.advanceToNextItem()
             self.applyAVPlayerRate()
             self.asset = item.asset
+            self.releaseLoaderIfUnused(previousAsset)
             self.startObservingAVPlayer(item: item)
             self.applyAVPlayerRate()
             self.prefetchNextTracks()
@@ -266,7 +270,7 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         }
         // Join the preloader's in-flight load of this URL; cancelling and re-requesting it stalls the start
         if let inFlight = nextAsset as? AVURLAsset,
-           inFlight.url == url,
+           inFlight.url == assetURL,
            inFlight.statusOfValue(forKey: "playable", error: nil) == .loading {
             nextAsset = nil
             asset = inFlight
@@ -274,17 +278,15 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return
         }
         nextAsset?.cancelLoading()
+        releaseLoaderIfUnused(nextAsset)
         nextAsset = nil
-        let pendingAsset = AVURLAsset(url: url, options: urlOptions)
+        let pendingAsset = StreamResourceLoader.makeAsset(url: url, options: urlOptions)
         asset = pendingAsset
         awaitAssetKeys(pendingAsset)
     }
 
     private static let assetKeys: [String] = [
         "playable",
-        "availableChapterLocales",
-        "availableMetadataFormats",
-        "commonMetadata",
         "duration"
     ]
 
@@ -316,35 +318,19 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
             return
         }
         
-        let keysToLoad: [String] = [
-            "playable",
-            "availableChapterLocales",
-            "availableMetadataFormats",
-            "commonMetadata",
-            "duration"
-        ]
+        let keysToLoad: [String] = Self.assetKeys
         
         let item = AVPlayerItem(asset: pendingAsset, automaticallyLoadedAssetKeys: keysToLoad)
         self.item = item
         item.preferredForwardBufferDuration = self.bufferDuration
         print("---- avplayer removeallitems ----")
+        let previousAssets = self.avPlayer.items().map { $0.asset }
         self.avPlayer.removeAllItems()
         self.avPlayer.insert(item, after: nil)
+        previousAssets.forEach { self.releaseLoaderIfUnused($0) }
         self.prefetchNextTracks()
         self.startObservingAVPlayer(item: item)
         self.applyAVPlayerRate()
-        if !pendingAsset.availableChapterLocales.isEmpty {
-            for locale in pendingAsset.availableChapterLocales {
-                let chapters = pendingAsset.chapterMetadataGroups(withTitleLocale: locale, containingItemsWithCommonKeys: nil)
-                self.delegate?.AVWrapper(didReceiveMetadata: chapters)
-            }
-        } else {
-            for format in pendingAsset.availableMetadataFormats {
-                let timeRange = CMTimeRange(start: .zero, end: pendingAsset.duration)
-                let group = AVTimedMetadataGroup(items: pendingAsset.metadata(forFormat: format), timeRange: timeRange)
-                self.delegate?.AVWrapper(didReceiveMetadata: [group])
-            }
-        }
         
         if let initialTime = self.timeToSeekToAfterLoading {
             self.timeToSeekToAfterLoading = nil
@@ -356,15 +342,14 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
         QueuedAudioPlayer.nextAudioItem.first?.getSourceUrl({ [weak self] urlString in
             guard let self = self else { return }
             guard let url = URL(string: urlString) else { return }
-            nextAsset = AVURLAsset(url: url)
+            let previousAsset = nextAsset
+            nextAsset = StreamResourceLoader.makeAsset(url: url, options: nil)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.releaseLoaderIfUnused(previousAsset)
+            }
             guard let asset = nextAsset else { return }
-            let keys = [
-                "playable",
-                "availableChapterLocales",
-                "availableMetadataFormats",
-                "commonMetadata",
-                "duration"
-            ]
+            let keys = Self.assetKeys
             asset.loadValuesAsynchronously(forKeys: keys) { [weak self] in
                 guard let self = self else { return }
                 var error: NSError?
@@ -389,8 +374,14 @@ public class AVPlayerWrapper: AVPlayerWrapperProtocol {
     }
     
     func preloadNextTracks(_ url: URL) {
-        guard !avPlayer.items().contains(where: { ($0.asset as? AVURLAsset)?.url == url} ) else { return }
+        let assetURL = StreamResourceLoader.assetURL(for: url)
+        guard !avPlayer.items().contains(where: { ($0.asset as? AVURLAsset)?.url == assetURL} ) else { return }
         self.nextPreloadUrl = url
+    }
+
+    private func releaseLoaderIfUnused(_ asset: AVAsset?) {
+        guard let asset, asset !== self.asset, !avPlayer.items().contains(where: { $0.asset === asset }) else { return }
+        StreamResourceLoader.release(asset: asset)
     }
 
     func clearPreloadedTracks() {
